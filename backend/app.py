@@ -28,7 +28,7 @@ def normalize_data(json_file):
         return pd.DataFrame()
 
 data = normalize_data(DATA_FILE)
-
+ratings_dir = {index: [] for index in range(len(data))}
 
 @app.route("/songs", methods=["GET"])
 def get_all_songs():
@@ -62,12 +62,24 @@ def rate_song(song_id):
         if song_index.empty:
             return jsonify({"error": "Song not found"}), 404
 
+        song_index = song_index[0]
         update_data = request.json
-        print('Hello:', update_data)
-        for key, value in update_data.items():
-            data.at[song_index[0], key] = value
+        if "rating" not in update_data:
+            return jsonify({"error": "Missing 'rating' in request"}), 400
 
-        return jsonify({"message": "Song rating updated successfully", "updated_song": data.loc[song_index[0]].to_dict()})
+        new_rating = update_data.get("rating")
+        if not isinstance(new_rating, (int, float)) or not (1 <= new_rating <= 5):
+            return jsonify({"error": "Rating must be a number between 1 and 5"}), 400
+
+        if song_index not in ratings_dir:
+            ratings_dir[song_index] = []
+        ratings_dir[song_index].append(int(new_rating))
+        
+        all_ratings = ratings_dir[song_index]
+        avg_rating = sum(all_ratings) / len(all_ratings)
+        data.at[song_index, "rating"] = avg_rating
+
+        return jsonify({"message": "Song rating updated successfully", "updated_song": data.loc[song_index].to_dict()})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
